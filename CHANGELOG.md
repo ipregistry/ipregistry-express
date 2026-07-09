@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-07-09
+
+### Changed
+
+- No functional changes. First release published through the automated
+  GitHub Actions workflow with npm trusted publishing and provenance.
+
 ## [1.0.0] - 2026-07-09
 
 ### Added
@@ -37,4 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TypeScript-first API with Express `Request`/`Locals` declaration merging,
   dual ESM/CJS build, Express 4.18+ and 5 support, Node.js 20+.
 
+[1.0.1]: https://github.com/ipregistry/ipregistry-express/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ipregistry/ipregistry-express/releases/tag/v1.0.0

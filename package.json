@@ -1,7 +1,7 @@
 {
     "name": "@ipregistry/express",
     "description": "Official Ipregistry integration for Express: middleware-driven IP geolocation and threat detection for every request.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "module",
     "main": "./dist/index.cjs",
     "module": "./dist/index.mjs",
