@@ -278,6 +278,35 @@ describe('ipregistry middleware', () => {
         })
     })
 
+    it('reports lookup telemetry through onLookup', async () => {
+        const onLookup = vi.fn()
+        const { app } = createApp({ onLookup })
+
+        await request(app).get('/context').set('X-Forwarded-For', PUBLIC_IP)
+
+        expect(onLookup).toHaveBeenCalledOnce()
+        const info = onLookup.mock.calls[0]?.[0]
+        expect(info.ip).toBe(PUBLIC_IP)
+        expect(info.coalesced).toBe(false)
+        expect(info.credits).toEqual({ consumed: 1, remaining: null })
+        expect(typeof info.latencyMs).toBe('number')
+    })
+
+    it('survives a throwing onLookup hook', async () => {
+        const { app } = createApp({
+            onLookup: () => {
+                throw new Error('metrics bug')
+            },
+        })
+
+        const response = await request(app)
+            .get('/context')
+            .set('X-Forwarded-For', PUBLIC_IP)
+
+        expect(response.status).toBe(200)
+        expect(response.body.data).toBeTruthy()
+    })
+
     it('coalesces concurrent lookups for the same IP', async () => {
         const calls: string[] = []
         const client = {

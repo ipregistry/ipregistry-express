@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One-time warning when a private connection IP arrives together with an
   `X-Forwarded-For` header, the classic sign of a reverse proxy without
   `trust proxy` configured.
+- `onLookup` hook reporting latency, credit, throttling, and coalescing
+  telemetry after each successful lookup, for metrics and cache-hit-ratio
+  monitoring.
+- Fail-fast validation: `blockCountries` and `redirectByCountry` reject
+  malformed country codes and destinations when the middleware is built.
 - `trust proxy`-aware IP extraction via `req.ip` by default, plus
   `cloudflare`, `nginx`, `forwarded-for`, single-header, and custom
   extractor sources. Values are validated and sanitized; private and

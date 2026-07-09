@@ -16,13 +16,6 @@
 
 import { ipregistry } from './middleware.js'
 
-export { ipregistry, type IpregistryOptions } from './middleware.js'
-
-/**
- * Default export for helmet-style importing:
- * `import ipregistry from '@ipregistry/express'`.
- */
-export default ipregistry
 export {
     blockCountries,
     blockThreats,
@@ -33,17 +26,17 @@ export {
     type RedirectByCountryOptions,
 } from './blocking.js'
 export {
+    createIpregistryClient,
+    MissingApiKeyError,
+    type IpregistryConnectionOptions,
+} from './config.js'
+export {
     isBot,
     isEuVisitor,
     isThreat,
     type IpInfoInput,
     type ThreatOptions,
 } from './guards.js'
-export {
-    createIpregistryClient,
-    MissingApiKeyError,
-    type IpregistryConnectionOptions,
-} from './config.js'
 export {
     anonymizeIp,
     createIpExtractor,
@@ -55,13 +48,18 @@ export {
     type TrustedProxyPreset,
 } from './ip.js'
 export {
+    ipregistry,
+    type IpregistryLookupInfo,
+    type IpregistryOptions,
+} from './middleware.js'
+export { fakeIpregistry, FAKE_IP, type PartialIpInfo } from './testing.js'
+export {
     getIpregistry,
     type IpregistryContext,
     type IpregistryErrorInfo,
     type IpregistryLookupContext,
     type IpregistrySkipReason,
 } from './types.js'
-export { fakeIpregistry, FAKE_IP, type PartialIpInfo } from './testing.js'
 
 // Re-exported from the official JavaScript SDK so applications rarely need
 // to depend on @ipregistry/client directly.
@@ -78,3 +76,9 @@ export type {
     TimeZone,
     UserAgent,
 } from '@ipregistry/client'
+
+/**
+ * Default export for helmet-style importing:
+ * `import ipregistry from '@ipregistry/express'`.
+ */
+export default ipregistry

@@ -130,6 +130,12 @@ describe('blockCountries', () => {
         expect(response.body.country).toBe('KP')
     })
 
+    it('rejects invalid country codes at setup time', () => {
+        expect(() => blockCountries({ countries: ['FRA'] })).toThrow(TypeError)
+        expect(() => blockCountries({ countries: ['F'] })).toThrow(TypeError)
+        expect(() => blockCountries({ countries: ['fr'] })).not.toThrow()
+    })
+
     it('errors clearly when ipregistry() did not run', async () => {
         const app = express()
         app.use(blockCountries({ countries: ['KP'] }))
@@ -261,6 +267,21 @@ describe('redirectByCountry', () => {
         const app = appWith({ ip: null, data: null }, redirect)
 
         expect((await request(app).get('/')).status).toBe(200)
+    })
+
+    it('rejects invalid codes and destinations at setup time', () => {
+        expect(() => redirectByCountry({ redirects: { FRA: '/fr' } })).toThrow(
+            TypeError,
+        )
+        expect(() =>
+            redirectByCountry({ redirects: { FR: 'not-a-url' } }),
+        ).toThrow(TypeError)
+        expect(() =>
+            redirectByCountry({ redirects: { FR: '/fr' } }),
+        ).not.toThrow()
+        expect(() =>
+            redirectByCountry({ redirects: { DE: 'https://example.de' } }),
+        ).not.toThrow()
     })
 })
 

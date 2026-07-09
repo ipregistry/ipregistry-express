@@ -49,8 +49,8 @@ const PRESET_HEADERS: Record<
     string[]
 > = {
     cloudflare: ['cf-connecting-ip'],
-    nginx: ['x-real-ip', 'x-forwarded-for'],
     'forwarded-for': ['x-forwarded-for'],
+    nginx: ['x-real-ip', 'x-forwarded-for'],
 }
 
 function headerValue(request: Request, name: string): string | undefined {

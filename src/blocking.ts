@@ -36,17 +36,21 @@ export interface BlockCountriesOptions {
     countries: string[]
 
     /**
+     * The plain-text body of the blocking response. Defaults to 'Access
+     * restricted in your region.'
+     */
+    message?: string
+
+    /**
      * 'block' (default) denies the listed countries; 'allow' denies every
      * country except the listed ones.
      */
     mode?: 'block' | 'allow'
 
     /**
-     * What to do when the country is unknown: no `location.country.code` in
-     * the response, or no data at all because the lookup was skipped
-     * (private IP, bot) or failed. Defaults to 'allow' (fail-open).
+     * A custom responder replacing the default plain-text response.
      */
-    unknown?: 'allow' | 'block'
+    response?: BlockResponder
 
     /**
      * The HTTP status of the blocking response. Defaults to 451 (Unavailable
@@ -55,15 +59,11 @@ export interface BlockCountriesOptions {
     status?: number
 
     /**
-     * The plain-text body of the blocking response. Defaults to 'Access
-     * restricted in your region.'
+     * What to do when the country is unknown: no `location.country.code` in
+     * the response, or no data at all because the lookup was skipped
+     * (private IP, bot) or failed. Defaults to 'allow' (fail-open).
      */
-    message?: string
-
-    /**
-     * A custom responder replacing the default plain-text response.
-     */
-    response?: BlockResponder
+    unknown?: 'allow' | 'block'
 }
 
 /**
@@ -80,6 +80,10 @@ export interface BlockCountriesOptions {
  * country is unknown; pass `unknown: 'block'` to fail closed.
  */
 export function blockCountries(options: BlockCountriesOptions): RequestHandler {
+    for (const code of options.countries) {
+        assertCountryCode(code, 'blockCountries()')
+    }
+
     const countries = new Set(
         options.countries.map((code) => code.toUpperCase()),
     )
@@ -121,17 +125,6 @@ export function blockCountries(options: BlockCountriesOptions): RequestHandler {
 
 export interface BlockThreatsOptions extends ThreatOptions {
     /**
-     * What to do when no security data is available because the lookup was
-     * skipped (private IP, bot) or failed. Defaults to 'allow' (fail-open).
-     */
-    unknown?: 'allow' | 'block'
-
-    /**
-     * The HTTP status of the blocking response. Defaults to 403.
-     */
-    status?: number
-
-    /**
      * The plain-text body of the blocking response. Defaults to
      * 'Access denied.'
      */
@@ -141,6 +134,17 @@ export interface BlockThreatsOptions extends ThreatOptions {
      * A custom responder replacing the default plain-text response.
      */
     response?: BlockResponder
+
+    /**
+     * The HTTP status of the blocking response. Defaults to 403.
+     */
+    status?: number
+
+    /**
+     * What to do when no security data is available because the lookup was
+     * skipped (private IP, bot) or failed. Defaults to 'allow' (fail-open).
+     */
+    unknown?: 'allow' | 'block'
 }
 
 /**
@@ -195,16 +199,16 @@ export interface RedirectByCountryOptions {
     redirects: Record<string, string>
 
     /**
-     * The redirect status. Defaults to 307 (temporary) so browsers do not
-     * cache a geo decision; use 308 for permanent country domains.
-     */
-    status?: 307 | 308
-
-    /**
      * Whether to append the current path and query to the destination, e.g.
      * FR + '/fr' turns '/pricing' into '/fr/pricing'. Defaults to false.
      */
     preservePath?: boolean
+
+    /**
+     * The redirect status. Defaults to 307 (temporary) so browsers do not
+     * cache a geo decision; use 308 for permanent country domains.
+     */
+    status?: 307 | 308
 }
 
 /**
@@ -224,6 +228,22 @@ export interface RedirectByCountryOptions {
 export function redirectByCountry(
     options: RedirectByCountryOptions,
 ): RequestHandler {
+    for (const [code, destination] of Object.entries(options.redirects)) {
+        assertCountryCode(code, 'redirectByCountry()')
+
+        if (!destination.startsWith('/')) {
+            try {
+                new URL(destination)
+            } catch {
+                throw new TypeError(
+                    `[ipregistry] redirectByCountry() destination ` +
+                        `'${destination}' for ${code.toUpperCase()} must ` +
+                        "be a path starting with '/' or an absolute URL.",
+                )
+            }
+        }
+    }
+
     const redirects = new Map(
         Object.entries(options.redirects).map(([code, destination]) => [
             code.toUpperCase(),
@@ -283,6 +303,19 @@ export function redirectByCountry(
                 : target.toString()
 
         response.redirect(status, location)
+    }
+}
+
+/**
+ * Country codes are validated when the middleware is built, so a typo fails
+ * fast at startup instead of silently never matching.
+ */
+function assertCountryCode(code: string, name: string): void {
+    if (!/^[A-Za-z]{2}$/.test(code)) {
+        throw new TypeError(
+            `[ipregistry] ${name} received '${code}', which is not an ` +
+                'ISO 3166-1 alpha-2 country code.',
+        )
     }
 }
 

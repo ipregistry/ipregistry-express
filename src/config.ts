@@ -51,21 +51,6 @@ export interface IpregistryConnectionOptions {
     baseUrl?: string
 
     /**
-     * The lookup timeout in milliseconds. Defaults to
-     * `process.env.IPREGISTRY_TIMEOUT`, then 3000. The default is lower than
-     * the SDK's because the lookup sits on the request path of every
-     * matched request.
-     */
-    timeout?: number
-
-    /**
-     * The maximum number of automatic retries. Defaults to 0: retrying with
-     * backoff inside request-path middleware would stall responses, and the
-     * default fail-open behavior is preferable to added latency.
-     */
-    maxRetries?: number
-
-    /**
      * The cache used to avoid repeated lookups for the same IP. Defaults to
      * the SDK's `InMemoryCache` (2048 entries, 10-minute expiry) shared
      * across requests handled by the same process. Pass any
@@ -79,6 +64,21 @@ export interface IpregistryConnectionOptions {
      * from the options above. Useful for tests and advanced setups.
      */
     client?: IpregistryClient
+
+    /**
+     * The maximum number of automatic retries. Defaults to 0: retrying with
+     * backoff inside request-path middleware would stall responses, and the
+     * default fail-open behavior is preferable to added latency.
+     */
+    maxRetries?: number
+
+    /**
+     * The lookup timeout in milliseconds. Defaults to
+     * `process.env.IPREGISTRY_TIMEOUT`, then 3000. The default is lower than
+     * the SDK's because the lookup sits on the request path of every
+     * matched request.
+     */
+    timeout?: number
 }
 
 /**

@@ -18,6 +18,8 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express'
 import {
     UserAgents,
     type ApiResponse,
+    type ApiResponseCredits,
+    type ApiResponseThrottling,
     type IpInfo,
     type IpregistryClient,
 } from '@ipregistry/client'
@@ -37,6 +39,32 @@ import {
 import type { IpregistryContext, IpregistrySkipReason } from './types.js'
 
 /**
+ * Telemetry about a completed lookup, passed to the `onLookup` hook.
+ */
+export interface IpregistryLookupInfo {
+    /**
+     * True when this request joined an API call already in flight for the
+     * same IP instead of issuing its own.
+     */
+    coalesced: boolean
+
+    /**
+     * The credits consumed and remaining as reported by the API. Cache hits
+     * report zero consumed credits, so this doubles as a cache-hit signal.
+     */
+    credits: ApiResponseCredits
+
+    /** The IP address the lookup ran for. */
+    ip: string
+
+    /** Wall-clock duration of the lookup as observed by this request. */
+    latencyMs: number
+
+    /** Rate-limit state, when the API key is throttled. */
+    throttling: ApiResponseThrottling | null
+}
+
+/**
  * Configuration of the `ipregistry()` middleware. Everything is optional:
  * with no configuration the middleware reads the API key from
  * `IPREGISTRY_API_KEY`, takes the client IP from `req.ip` (honoring the
@@ -44,6 +72,27 @@ import type { IpregistryContext, IpregistrySkipReason } from './types.js'
  * assets, and fails open.
  */
 export interface IpregistryOptions extends IpregistryConnectionOptions {
+    /**
+     * Whether to log skipped and failed lookups with `console.warn`
+     * (IP addresses are anonymized). Defaults to false.
+     */
+    debug?: boolean
+
+    /**
+     * A fixed IP address used when the extracted client IP is missing or
+     * private, which is the norm on localhost. Handy in development to
+     * exercise geo features; leave unset in production.
+     */
+    developmentIp?: string
+
+    /**
+     * When the lookup fails (timeout, API error, missing key), the
+     * middleware fails open by default: the request proceeds without data.
+     * Set to true to respond with 503 instead, or to a number to choose the
+     * status. Skipped lookups (static assets, bots, no IP) are unaffected.
+     */
+    failClosed?: boolean | number
+
     /**
      * Selects the Ipregistry response fields to fetch, as a comma-separated
      * list (e.g. 'ip,location,security'). Fewer fields mean faster lookups.
@@ -68,19 +117,25 @@ export interface IpregistryOptions extends IpregistryConnectionOptions {
     ipSource?: IpSource
 
     /**
-     * A fixed IP address used when the extracted client IP is missing or
-     * private, which is the norm on localhost. Handy in development to
-     * exercise geo features; leave unset in production.
+     * Called when a lookup fails, before the fail-open/fail-closed decision.
+     * Use it to report to your monitoring. The library itself never logs
+     * full IP addresses; do the same in your handler.
      */
-    developmentIp?: string
+    onError?: (error: unknown, request: Request) => void
 
     /**
-     * Whether to skip lookups for static assets (favicon and common file
-     * extensions). Defaults to true so assets never consume credits; set to
-     * false if assets are served elsewhere (nginx, CDN) or before this
-     * middleware and you want everything else enriched.
+     * Called after every successful lookup with latency, credit, and
+     * throttling telemetry. Use it to feed metrics: credit consumption,
+     * cache-hit ratio (cache hits report zero consumed credits), and API
+     * latency. Exceptions thrown by the hook are swallowed.
      */
-    skipStaticAssets?: boolean
+    onLookup?: (info: IpregistryLookupInfo, request: Request) => void
+
+    /**
+     * A custom predicate deciding whether to skip the lookup for a request.
+     * Runs after the static-asset and bot checks.
+     */
+    skip?: (request: Request) => boolean
 
     /**
      * Whether to skip lookups for search bots and crawlers, identified by
@@ -91,31 +146,12 @@ export interface IpregistryOptions extends IpregistryConnectionOptions {
     skipBots?: boolean | RegExp
 
     /**
-     * A custom predicate deciding whether to skip the lookup for a request.
-     * Runs after the static-asset and bot checks.
+     * Whether to skip lookups for static assets (favicon and common file
+     * extensions). Defaults to true so assets never consume credits; set to
+     * false if assets are served elsewhere (nginx, CDN) or before this
+     * middleware and you want everything else enriched.
      */
-    skip?: (request: Request) => boolean
-
-    /**
-     * When the lookup fails (timeout, API error, missing key), the
-     * middleware fails open by default: the request proceeds without data.
-     * Set to true to respond with 503 instead, or to a number to choose the
-     * status. Skipped lookups (static assets, bots, no IP) are unaffected.
-     */
-    failClosed?: boolean | number
-
-    /**
-     * Called when a lookup fails, before the fail-open/fail-closed decision.
-     * Use it to report to your monitoring. The library itself never logs
-     * full IP addresses; do the same in your handler.
-     */
-    onError?: (error: unknown, request: Request) => void
-
-    /**
-     * Whether to log skipped and failed lookups with `console.warn`
-     * (IP addresses are anonymized). Defaults to false.
-     */
-    debug?: boolean
+    skipStaticAssets?: boolean
 }
 
 const STATIC_EXTENSIONS =
@@ -217,9 +253,12 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
             try {
                 client ??= createIpregistryClient(options)
 
+                const started = Date.now()
                 let lookup = inflight.get(lookupIp)
+                let coalesced = true
 
                 if (!lookup) {
+                    coalesced = false
                     lookup = client.lookupIp(lookupIp, {
                         ...(fields !== undefined ? { fields } : {}),
                         ...(options.hostname !== undefined
@@ -233,6 +272,24 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
                 }
 
                 const apiResponse = await lookup
+
+                if (options.onLookup) {
+                    try {
+                        options.onLookup(
+                            {
+                                ip: lookupIp,
+                                latencyMs: Date.now() - started,
+                                credits: apiResponse.credits,
+                                throttling: apiResponse.throttling,
+                                coalesced,
+                            },
+                            request,
+                        )
+                    } catch {
+                        // A throwing onLookup hook must not break the request.
+                    }
+                }
+
                 finish(request, response, next, {
                     ip: lookupIp,
                     data: apiResponse.data,

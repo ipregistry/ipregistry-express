@@ -117,6 +117,7 @@ Everything is optional. Explicit options take precedence over environment variab
 | `ipSource`         | None                  | `'express'`      | Where to read the client IP from (see below).                                                 |
 | `maxRetries`       | None                  | `0`              | Automatic retries. Off by default because retrying on the request path would stall responses. |
 | `onError`          | None                  | None             | Callback for lookup failures (monitoring).                                                    |
+| `onLookup`         | None                  | None             | Callback after each successful lookup with latency, credit, and throttling telemetry.         |
 | `skip`             | None                  | None             | Custom predicate to skip a request.                                                           |
 | `skipBots`         | None                  | `false`          | Skip crawlers: `true` (SDK heuristic) or a custom `RegExp`.                                   |
 | `skipStaticAssets` | None                  | `true`           | Skip favicon and common asset extensions.                                                     |
@@ -145,6 +146,8 @@ blockCountries({
     },
 })
 ```
+
+Country codes and redirect destinations are validated when the middleware is built, so a typo fails fast at startup instead of silently never matching.
 
 Like any Express middleware, blocking can be scoped to a router or a single route:
 
@@ -315,6 +318,25 @@ app.use(
 
 The blocking middlewares fail open independently: when the lookup was skipped or failed, `blockCountries` and `blockThreats` let the request through unless you pass `unknown: 'block'`.
 
+## Monitoring
+
+The `onLookup` hook fires after every successful lookup with latency, credit, and throttling telemetry — cache hits report zero consumed credits, so it doubles as a cache-hit-ratio signal:
+
+```js
+app.use(
+    ipregistry({
+        onLookup: ({ latencyMs, credits, coalesced }) => {
+            metrics.timing('ipregistry.lookup', latencyMs)
+            metrics.increment('ipregistry.credits', credits.consumed ?? 0)
+            if (coalesced) metrics.increment('ipregistry.coalesced')
+        },
+        onError: (error) => reportToMonitoring(error),
+    }),
+)
+```
+
+Exceptions thrown by the hooks are swallowed: monitoring code can never break request handling.
+
 ## Testing your app
 
 `fakeIpregistry()` attaches a canned context — no HTTP, no API key, no credits. The real middleware leaves requests that already carry a context untouched, so the fake can be mounted in front of your app as-is:
@@ -341,19 +363,19 @@ Partial `IpInfo` values are merged into a realistic US-based sample; passing a f
 
 | Export                            | Description                                                                                                                                   |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ipregistry(options)`             | The enrichment middleware. Attaches `req.ipregistry` and `res.locals.ipregistry`.                                                             |
 | `blockCountries(options)`         | Middleware that blocks (or exclusively allows) visitors by ISO 3166-1 country code.                                                           |
 | `blockThreats(options)`           | Middleware that blocks visitors flagged by Ipregistry security data.                                                                          |
-| `redirectByCountry(options)`      | Middleware that redirects visitors to country-specific paths or domains, loop-safe.                                                           |
+| `createIpExtractor(source)`       | Builds an IP extractor from an `IpSource` (presets, header, or function).                                                                     |
+| `createIpregistryClient(options)` | Builds the underlying SDK client from options and environment variables.                                                                      |
+| `fakeIpregistry(data?)`           | Testing middleware that attaches a canned context.                                                                                            |
 | `getIpregistry(req)`              | Reads the request's context; returns a `skipped: 'no-middleware'` context when the middleware did not run. Never throws, never calls the API. |
+| `ipregistry(options)`             | The enrichment middleware (also the default export). Attaches `req.ipregistry` and `res.locals.ipregistry`.                                   |
+| `isBot(input)`                    | True for bot user agents. Accepts a user agent string, a request, or a parsed SDK `UserAgent`.                                                |
 | `isEuVisitor(input, options?)`    | True when the visitor is in the European Union, based on `location.in_eu`. Accepts an `IpInfo` or an `IpregistryContext`.                     |
 | `isThreat(input, options?)`       | True when the IP is flagged by `security.is_threat`, `is_attacker`, or `is_abuser`. Proxy, Tor, VPN, and relay signals are opt-in.            |
-| `isBot(input)`                    | True for bot user agents. Accepts a user agent string, a request, or a parsed SDK `UserAgent`.                                                |
-| `fakeIpregistry(data?)`           | Testing middleware that attaches a canned context.                                                                                            |
-| `createIpregistryClient(options)` | Builds the underlying SDK client from options and environment variables.                                                                      |
-| `createIpExtractor(source)`       | Builds an IP extractor from an `IpSource` (presets, header, or function).                                                                     |
+| `redirectByCountry(options)`      | Middleware that redirects visitors to country-specific paths or domains, loop-safe.                                                           |
 
-Types: `IpregistryOptions`, `IpregistryContext`, `IpregistryLookupContext`, `IpregistrySkipReason`, `IpregistryErrorInfo`, `ThreatOptions`, `BlockCountriesOptions`, `BlockThreatsOptions`, `RedirectByCountryOptions`, `IpSource`, `IpExtractor`, `TrustedProxyPreset`, plus the SDK's `IpInfo`, `Location`, `Security`, `Connection`, `Company`, `Carrier`, `Currency`, `TimeZone`, and `UserAgent`.
+Types: `BlockCountriesOptions`, `BlockThreatsOptions`, `IpExtractor`, `IpregistryContext`, `IpregistryErrorInfo`, `IpregistryLookupContext`, `IpregistryLookupInfo`, `IpregistryOptions`, `IpregistrySkipReason`, `IpSource`, `RedirectByCountryOptions`, `ThreatOptions`, `TrustedProxyPreset`, plus the SDK's `Carrier`, `Company`, `Connection`, `Currency`, `IpInfo`, `Location`, `Security`, `TimeZone`, and `UserAgent`.
 
 ## Using the SDK directly
 
