@@ -52,6 +52,7 @@
         "lint": "eslint src test",
         "prepack": "npm run clean && npm run build",
         "test": "vitest run",
+        "test:smoke": "node test/smoke.mjs",
         "test:watch": "vitest",
         "typecheck": "tsc --noEmit"
     },
@@ -70,6 +71,7 @@
         "eslint": "^10.6.0",
         "eslint-config-prettier": "^10.1.8",
         "express": "^5.2.1",
+        "globals": "^17.7.0",
         "prettier": "^3.0.0",
         "supertest": "^7.1.0",
         "tsup": "^8.0.0",

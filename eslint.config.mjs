@@ -1,9 +1,11 @@
 import eslint from '@eslint/js'
 import prettier from 'eslint-config-prettier/flat'
+import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
     { ignores: ['dist/', 'examples/', 'coverage/'] },
+    { languageOptions: { globals: globals.node } },
     eslint.configs.recommended,
     tseslint.configs.recommended,
     prettier,

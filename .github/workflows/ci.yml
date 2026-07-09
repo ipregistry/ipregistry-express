@@ -45,3 +45,7 @@ jobs:
       - name: Build
         if: matrix.express-version == '5'
         run: npm run build
+
+      - name: Packaging smoke test
+        if: matrix.express-version == '5'
+        run: npm run test:smoke
