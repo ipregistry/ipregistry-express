@@ -1,0 +1,86 @@
+{
+    "name": "@ipregistry/express",
+    "description": "Official Ipregistry integration for Express: middleware-driven IP geolocation and threat detection for every request.",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.cts",
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        },
+        "./package.json": "./package.json"
+    },
+    "sideEffects": false,
+    "homepage": "https://ipregistry.co",
+    "license": "Apache-2.0",
+    "keywords": [
+        "express",
+        "expressjs",
+        "middleware",
+        "geolocation",
+        "ip",
+        "ipaddress",
+        "ip intelligence",
+        "ip geolocation",
+        "ipregistry",
+        "geoblocking",
+        "gdpr",
+        "threat-data",
+        "typescript",
+        "nodejs"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ipregistry/ipregistry-express.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ipregistry/ipregistry-express/issues"
+    },
+    "scripts": {
+        "build": "tsup",
+        "clean": "rm -rf dist/",
+        "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|mjs|ts|json|md)\"",
+        "prepack": "npm run clean && npm run build",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "typecheck": "tsc --noEmit"
+    },
+    "author": "Ipregistry <support@ipregistry.co>",
+    "dependencies": {
+        "@ipregistry/client": "^7.0.0"
+    },
+    "peerDependencies": {
+        "express": ">=4.18.0 <6"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.0",
+        "@types/node": "^26.1.0",
+        "@types/supertest": "^6.0.2",
+        "express": "^5.2.1",
+        "prettier": "^3.0.0",
+        "supertest": "^7.1.0",
+        "tsup": "^8.0.0",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.9"
+    },
+    "files": [
+        "dist/**",
+        "CHANGELOG.md"
+    ],
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "private": false
+}

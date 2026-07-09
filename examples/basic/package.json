@@ -1,0 +1,12 @@
+{
+    "name": "ipregistry-express-example-basic",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "start": "node server.mjs"
+    },
+    "dependencies": {
+        "@ipregistry/express": "^1.0.0",
+        "express": "^5.2.1"
+    }
+}
