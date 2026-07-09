@@ -40,13 +40,17 @@ console.log('esm ok')
 let tarball
 
 try {
-    // Lifecycle script output (prepack build logs) can precede the JSON on
-    // stdout, so parse from the first JSON token onwards.
+    // Lifecycle script output (prepack build logs) precedes the JSON on
+    // stdout, so parse from the last line that opens the JSON array. Colors
+    // are disabled because ANSI escape codes also contain '['.
     const packOutput = execFileSync('npm', ['pack', '--json'], {
         cwd: root,
         encoding: 'utf8',
+        env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
     })
-    const packed = JSON.parse(packOutput.slice(packOutput.indexOf('[')))
+    const packed = JSON.parse(
+        packOutput.slice(packOutput.lastIndexOf('\n[') + 1),
+    )
     tarball = join(root, packed[0].filename)
 
     writeFileSync(
