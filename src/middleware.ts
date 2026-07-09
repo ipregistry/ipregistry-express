@@ -15,7 +15,12 @@
  */
 
 import type { NextFunction, Request, RequestHandler, Response } from 'express'
-import { UserAgents, type IpregistryClient } from '@ipregistry/client'
+import {
+    UserAgents,
+    type ApiResponse,
+    type IpInfo,
+    type IpregistryClient,
+} from '@ipregistry/client'
 
 import {
     createIpregistryClient,
@@ -162,6 +167,11 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
     // error instead of crashing the app at boot time.
     let client: IpregistryClient | undefined
 
+    // Concurrent requests from the same IP share a single API call: the SDK
+    // cache only stores completed lookups, so without this a burst of
+    // parallel requests from one client would consume one credit each.
+    const inflight = new Map<string, Promise<ApiResponse<IpInfo>>>()
+
     return function ipregistryMiddleware(
         request: Request,
         response: Response,
@@ -186,6 +196,8 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
         }
 
         if (!ip || isPrivateIp(ip)) {
+            maybeWarnAboutTrustProxy(request, options)
+
             if (options.debug) {
                 console.warn(
                     '[ipregistry] no public client IP found, skipping lookup',
@@ -204,12 +216,23 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
         void (async () => {
             try {
                 client ??= createIpregistryClient(options)
-                const apiResponse = await client.lookupIp(lookupIp, {
-                    ...(fields !== undefined ? { fields } : {}),
-                    ...(options.hostname !== undefined
-                        ? { hostname: options.hostname }
-                        : {}),
-                })
+
+                let lookup = inflight.get(lookupIp)
+
+                if (!lookup) {
+                    lookup = client.lookupIp(lookupIp, {
+                        ...(fields !== undefined ? { fields } : {}),
+                        ...(options.hostname !== undefined
+                            ? { hostname: options.hostname }
+                            : {}),
+                    })
+                    inflight.set(lookupIp, lookup)
+
+                    const cleanup = () => inflight.delete(lookupIp)
+                    lookup.then(cleanup, cleanup)
+                }
+
+                const apiResponse = await lookup
                 finish(request, response, next, {
                     ip: lookupIp,
                     data: apiResponse.data,
@@ -229,14 +252,16 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
                 }
 
                 if (options.failClosed) {
-                    response
-                        .status(
-                            typeof options.failClosed === 'number'
-                                ? options.failClosed
-                                : 503,
-                        )
-                        .type('text/plain')
-                        .send('Service temporarily unavailable.')
+                    if (!response.headersSent) {
+                        response
+                            .status(
+                                typeof options.failClosed === 'number'
+                                    ? options.failClosed
+                                    : 503,
+                            )
+                            .type('text/plain')
+                            .send('Service temporarily unavailable.')
+                    }
                     return
                 }
 
@@ -248,6 +273,40 @@ export function ipregistry(options: IpregistryOptions = {}): RequestHandler {
             }
         })()
     }
+}
+
+let warnedAboutTrustProxy = false
+
+/**
+ * Detects the classic production misconfiguration where the app sits behind
+ * a reverse proxy but `trust proxy` is not set: the connection IP is private
+ * while the request carries an X-Forwarded-For header, so every lookup is
+ * skipped (or worse, runs for the proxy's own address). Warned once per
+ * process, only for the default 'express' IP source.
+ */
+function maybeWarnAboutTrustProxy(
+    request: Request,
+    options: IpregistryOptions,
+): void {
+    if (
+        warnedAboutTrustProxy ||
+        (options.ipSource !== undefined && options.ipSource !== 'express') ||
+        !request.headers['x-forwarded-for'] ||
+        request.app?.enabled?.('trust proxy')
+    ) {
+        return
+    }
+
+    warnedAboutTrustProxy = true
+    console.warn(
+        '[ipregistry] the connection IP is private but the request ' +
+            'carries an X-Forwarded-For header. If this app runs behind a ' +
+            "reverse proxy, set app.set('trust proxy', ...) so req.ip " +
+            'reflects the real client ' +
+            '(https://expressjs.com/en/guide/behind-proxies.html), or ' +
+            'configure the ipSource option. Until then lookups are ' +
+            'skipped. This warning is only shown once.',
+    )
 }
 
 function finish(

@@ -69,6 +69,8 @@ app.use(
 )
 ```
 
+The default export is the same factory, so `import ipregistry from '@ipregistry/express'` works too.
+
 Step 3: read the data anywhere after the middleware:
 
 ```js
@@ -210,7 +212,7 @@ app.get('/', (req, res) => {
 
 ## Caching
 
-Lookups are cached by default with the SDK's `InMemoryCache` (LRU, 2048 entries, 10-minute expiry), scoped to the process. Repeated requests from the same IP consume a single credit until expiry. Plug any store by implementing the SDK's `IpregistryCache` interface:
+Lookups are cached by default with the SDK's `InMemoryCache` (LRU, 2048 entries, 10-minute expiry), scoped to the process. Repeated requests from the same IP consume a single credit until expiry, and concurrent requests from the same IP are coalesced into a single API call, so a burst of parallel requests from one client also consumes a single credit. Plug any store by implementing the SDK's `IpregistryCache` interface:
 
 ```js
 import { InMemoryCache } from '@ipregistry/client'
@@ -254,6 +256,8 @@ app.use(ipregistry({ ipSource: (req) => req.headers['x-my-edge-ip'] ?? null }))
 ```
 
 Extracted values are validated; ports, IPv6 brackets, IPv4-mapped prefixes, and zone IDs are stripped; private and reserved addresses are never sent to the API.
+
+If the middleware sees a private connection IP together with an `X-Forwarded-For` header — the classic sign of a reverse proxy without `trust proxy` configured — it logs a one-time warning pointing at this section instead of silently skipping every lookup.
 
 On localhost your IP is private, so no lookup happens. To exercise geo features in development:
 

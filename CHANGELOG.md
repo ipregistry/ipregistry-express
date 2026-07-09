@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of the official Ipregistry Express integration, built on
   `@ipregistry/client` v7.
-- `ipregistry()` middleware: enriches requests with Ipregistry data as
-  `req.ipregistry` (mirrored on `res.locals.ipregistry`), with field
-  selection, in-memory LRU caching, static-asset/bot/custom skips,
-  `developmentIp`, fail-open by default with optional fail-closed, and
-  `onError`/`debug` hooks.
+- `ipregistry()` middleware (also the default export): enriches requests
+  with Ipregistry data as `req.ipregistry` (mirrored on
+  `res.locals.ipregistry`), with field selection, in-memory LRU caching,
+  coalescing of concurrent lookups for the same IP, static-asset/bot/custom
+  skips, `developmentIp`, fail-open by default with optional fail-closed,
+  and `onError`/`debug` hooks.
+- One-time warning when a private connection IP arrives together with an
+  `X-Forwarded-For` header, the classic sign of a reverse proxy without
+  `trust proxy` configured.
 - `trust proxy`-aware IP extraction via `req.ip` by default, plus
   `cloudflare`, `nginx`, `forwarded-for`, single-header, and custom
   extractor sources. Values are validated and sanitized; private and

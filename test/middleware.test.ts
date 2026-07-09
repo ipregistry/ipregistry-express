@@ -277,4 +277,66 @@ describe('ipregistry middleware', () => {
             skipped: 'no-middleware',
         })
     })
+
+    it('coalesces concurrent lookups for the same IP', async () => {
+        const calls: string[] = []
+        const client = {
+            async lookupIp(ip: string) {
+                calls.push(ip)
+                await new Promise((resolve) => setTimeout(resolve, 25))
+                return {
+                    credits: { consumed: 1, remaining: null },
+                    data: ipInfo(),
+                    throttling: null,
+                }
+            },
+        } as never
+
+        const app = express()
+        app.set('trust proxy', true)
+        app.use(ipregistry({ client }))
+        app.get('/context', (req, res) => res.json(getIpregistry(req)))
+
+        const responses = await Promise.all([
+            request(app).get('/context').set('X-Forwarded-For', PUBLIC_IP),
+            request(app).get('/context').set('X-Forwarded-For', PUBLIC_IP),
+            request(app).get('/context').set('X-Forwarded-For', '8.8.8.8'),
+        ])
+
+        for (const response of responses) {
+            expect(response.status).toBe(200)
+            expect(response.body.data).toBeTruthy()
+        }
+
+        // Two distinct IPs, three requests: only two API calls.
+        expect(calls.sort()).toEqual(['8.8.8.8', PUBLIC_IP].sort())
+    })
+
+    it('warns once when X-Forwarded-For is present but trust proxy is off', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        try {
+            const stub = stubClient()
+            const app = express() // trust proxy intentionally not set
+            app.use(ipregistry({ client: stub.client }))
+            app.get('/context', (req, res) => res.json(getIpregistry(req)))
+
+            const first = await request(app)
+                .get('/context')
+                .set('X-Forwarded-For', PUBLIC_IP)
+            await request(app).get('/context').set('X-Forwarded-For', PUBLIC_IP)
+
+            // req.ip is the loopback socket address, so the lookup is
+            // skipped and the misconfiguration warning fires exactly once.
+            expect(first.body.skipped).toBe('no-ip')
+            expect(stub.calls).toHaveLength(0)
+
+            const trustProxyWarnings = warn.mock.calls.filter((call) =>
+                String(call[0]).includes('trust proxy'),
+            )
+            expect(trustProxyWarnings).toHaveLength(1)
+        } finally {
+            warn.mockRestore()
+        }
+    })
 })

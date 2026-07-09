@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
+import { ipregistry } from './middleware.js'
+
 export { ipregistry, type IpregistryOptions } from './middleware.js'
+
+/**
+ * Default export for helmet-style importing:
+ * `import ipregistry from '@ipregistry/express'`.
+ */
+export default ipregistry
 export {
     blockCountries,
     blockThreats,
