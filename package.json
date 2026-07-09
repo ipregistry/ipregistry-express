@@ -49,6 +49,7 @@
         "build": "tsup",
         "clean": "rm -rf dist/",
         "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|mjs|ts|json|md)\"",
+        "lint": "eslint src test",
         "prepack": "npm run clean && npm run build",
         "test": "vitest run",
         "test:watch": "vitest",
@@ -62,14 +63,18 @@
         "express": ">=4.18.0 <6"
     },
     "devDependencies": {
+        "@eslint/js": "^10.0.1",
         "@types/express": "^5.0.0",
         "@types/node": "^26.1.0",
         "@types/supertest": "^7.2.0",
+        "eslint": "^10.6.0",
+        "eslint-config-prettier": "^10.1.8",
         "express": "^5.2.1",
         "prettier": "^3.0.0",
         "supertest": "^7.1.0",
         "tsup": "^8.0.0",
         "typescript": "^6.0.3",
+        "typescript-eslint": "^8.63.0",
         "vitest": "^4.1.9"
     },
     "files": [

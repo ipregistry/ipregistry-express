@@ -31,6 +31,10 @@ jobs:
         if: matrix.express-version == '4'
         run: npm install --no-save express@4 @types/express@4
 
+      - name: Lint
+        if: matrix.express-version == '5'
+        run: npm run lint
+
       - name: Type check
         if: matrix.express-version == '5'
         run: npm run typecheck
