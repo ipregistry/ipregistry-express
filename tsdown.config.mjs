@@ -1,5 +1,8 @@
 import { defineConfig } from 'tsdown'
 
+// Plain JavaScript so the config loads on every supported Node version:
+// loading a .ts config requires either Node 22.18+ type stripping or
+// tsdown's optional 'unrun' peer dependency.
 export default defineConfig({
     entry: {
         index: 'src/index.ts',
