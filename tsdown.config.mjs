@@ -12,7 +12,9 @@ export default defineConfig({
     sourcemap: true,
     minify: false,
     target: 'es2022',
-    external: ['express', '@ipregistry/client'],
+    deps: {
+        neverBundle: ['express', '@ipregistry/client'],
+    },
     outputOptions: {
         // The default export intentionally accompanies the named exports
         // (helmet-style importing); CJS consumers reach it via `.default`.
